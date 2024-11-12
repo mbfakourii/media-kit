@@ -69,7 +69,12 @@ class MediaKitVideoPlayer extends VideoPlayerPlatform {
   Future<int?> create(DataSource dataSource) async {
     final player = Player();
     final completer = Completer();
-    final videoController = VideoController(player);
+    final videoController = VideoController(
+      player,
+      configuration: const VideoControllerConfiguration(
+        hwdec: 'no',
+      ),
+    );
     // NOTE: [StreamController] without broadcast buffers events.
     final streamController = StreamController<VideoEvent>();
     final streamSubscriptions = <StreamSubscription>[];
