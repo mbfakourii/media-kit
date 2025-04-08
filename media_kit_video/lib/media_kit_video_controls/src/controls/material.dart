@@ -11,7 +11,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/extensions/duration.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/methods/video_state.dart';
 import 'package:media_kit_video/media_kit_video_controls/src/controls/widgets/video_controls_theme_data_injector.dart';
-import 'package:screen_brightness/screen_brightness.dart';
+import 'package:screen_brightness_platform_interface/screen_brightness_platform_interface.dart';
 import 'package:volume_controller/volume_controller.dart';
 
 /// {@template material_video_controls}
@@ -406,8 +406,8 @@ class MaterialVideoControlsThemeData {
           this.seekOnDoubleTapLayoutWidgetRatios,
       seekOnDoubleTapBackwardDuration: seekOnDoubleTapBackwardDuration ??
           this.seekOnDoubleTapBackwardDuration,
-      seekOnDoubleTapForwardDuration: seekOnDoubleTapForwardDuration ??
-          this.seekOnDoubleTapForwardDuration,
+      seekOnDoubleTapForwardDuration:
+          seekOnDoubleTapForwardDuration ?? this.seekOnDoubleTapForwardDuration,
       visibleOnMount: visibleOnMount ?? this.visibleOnMount,
       speedUpOnLongPress: speedUpOnLongPress ?? this.speedUpOnLongPress,
       speedUpFactor: speedUpFactor ?? this.speedUpFactor,
@@ -522,6 +522,7 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
   bool _speedUpIndicator = false;
   late /* private */ var playlist = controller(context).player.state.playlist;
   late bool buffering = controller(context).player.state.buffering;
+  final VolumeController _volumeController = VolumeController.instance;
 
   bool _mountSeekBackwardButton = false;
   bool _mountSeekForwardButton = false;
@@ -619,7 +620,8 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
     // package:screen_brightness
     Future.microtask(() async {
       try {
-        await ScreenBrightness().resetScreenBrightness();
+        await ScreenBrightnessPlatform.instance
+            .resetApplicationScreenBrightness();
       } catch (_) {}
     });
     // --------------------------------------------------
@@ -758,27 +760,11 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
     return _isInSegment(localX, 2);
   }
 
-  bool _isInCenterSegment(double localX) {
-    return _isInSegment(localX, 1);
-  }
-
   bool _isInLeftSegment(double localX) {
     return _isInSegment(localX, 0);
   }
 
   void _handlePointerDown(PointerDownEvent event) {
-    if (!(_isInCenterSegment(event.position.dx))) {
-      return;
-    }
-
-    onTap();
-  }
-
-  void _handleTapDown(TapDownDetails details) {
-    if ((_isInCenterSegment(details.localPosition.dx))) {
-      return;
-    }
-
     onTap();
   }
 
@@ -789,9 +775,9 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
     // package:volume_controller
     Future.microtask(() async {
       try {
-        VolumeController().showSystemUI = false;
-        _volumeValue = await VolumeController().getVolume();
-        VolumeController().listener((value) {
+        _volumeController.showSystemUI = false;
+        _volumeValue = await _volumeController.getVolume();
+        _volumeController.addListener((value) {
           if (mounted && !_volumeInterceptEventStream) {
             setState(() {
               _volumeValue = value;
@@ -805,8 +791,9 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
     // package:screen_brightness
     Future.microtask(() async {
       try {
-        _brightnessValue = await ScreenBrightness().current;
-        ScreenBrightness().onCurrentBrightnessChanged.listen((value) {
+        _brightnessValue = await ScreenBrightnessPlatform.instance.application;
+        ScreenBrightnessPlatform.instance.onApplicationScreenBrightnessChanged
+            .listen((value) {
           if (mounted) {
             setState(() {
               _brightnessValue = value;
@@ -822,7 +809,7 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
     // --------------------------------------------------
     // package:volume_controller
     try {
-      VolumeController().setVolume(value);
+      _volumeController.setVolume(value);
     } catch (_) {}
     setState(() {
       _volumeValue = value;
@@ -845,7 +832,8 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
     // --------------------------------------------------
     // package:screen_brightness
     try {
-      await ScreenBrightness().setScreenBrightness(value);
+      await ScreenBrightnessPlatform.instance
+          .setApplicationScreenBrightness(value);
     } catch (_) {}
     setState(() {
       _brightnessIndicator = true;
@@ -921,7 +909,6 @@ class _MaterialVideoControlsState extends State<_MaterialVideoControls> {
                       child: Listener(
                         onPointerDown: (event) => _handlePointerDown(event),
                         child: GestureDetector(
-                          onTapDown: (details) => _handleTapDown(details),
                           onDoubleTapDown: _handleDoubleTapDown,
                           onLongPress: _theme(context).speedUpOnLongPress
                               ? _handleLongPress
